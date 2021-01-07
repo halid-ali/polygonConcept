@@ -1,10 +1,13 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_sliding_up_panel/flutter_sliding_up_panel.dart';
 import 'package:latlong/latlong.dart';
+import 'package:polygonConcept/common/intersectionPath.dart';
 import 'package:polygonConcept/intersectionDetector.dart';
+import 'package:polygonConcept/playground.dart';
 
 void main() => runApp(MaterialApp(home: PolygonConcept()));
 
@@ -18,10 +21,10 @@ class _PolygonConceptState extends State<PolygonConcept> {
   List<Offset> polygonOffsets = [];
   bool isPolygonCompleted = false;
   int offsetIndex = 0;
-  double rotateVal = 0;
+  double angle = 0;
+  IntersectionPath intersectionPath;
 
   Widget pathTraverser = Container();
-  Widget intersectionPath = Container();
   List<Widget> intersectionPoints = List<Widget>();
 
   @override
@@ -58,31 +61,45 @@ class _PolygonConceptState extends State<PolygonConcept> {
                 ],
               ),
             ),
-            intersectionPath,
+            Container(
+              child: CustomPaint(
+                painter: intersectionPath,
+              ),
+            ),
             pathTraverser,
             ...intersectionPoints,
             SlidingUpPanelWidget(
-              controlHeight: 100,
+              controlHeight: 150,
               panelController: null,
               child: Container(
                 color: Colors.white,
                 alignment: Alignment.topCenter,
                 child: Padding(
                   padding: EdgeInsets.all(10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Column(
                     children: <Widget>[
-                      Container(
-                        padding: EdgeInsets.all(10),
-                        child: RaisedButton(
-                          onPressed: _traversePaths,
-                          child: Text('Traverse Paths'),
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Container(
+                            padding: EdgeInsets.all(10),
+                            child: RaisedButton(
+                              onPressed: _traversePaths,
+                              child: Text('Traverse Paths'),
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        child: RaisedButton(
-                          onPressed: _rotatePath,
-                          child: Text('Rotate'),
+                      SizedBox(
+                        height: 50,
+                        child: Slider(
+                          value: angle,
+                          min: 0,
+                          max: 360,
+                          divisions: 36,
+                          activeColor: Colors.red,
+                          label: angle.round().toString(),
+                          onChanged: (double value) => _rotateAngle(value),
                         ),
                       ),
                     ],
@@ -96,24 +113,56 @@ class _PolygonConceptState extends State<PolygonConcept> {
     );
   }
 
-  void _rotatePath() {
+  void _rotateAngle(double value) {
     setState(() {
-      rotateVal += 10;
-      intersectionPath = Container(
-        child: CustomPaint(
-          painter: EdgePainter(
-            Offset(rotateVal, 0),
-            Offset(
-              MediaQuery.of(context).size.width - rotateVal,
-              MediaQuery.of(context).size.height,
-            ),
-            color: Colors.yellow,
-          ),
-          child: Container(),
-        ),
-      );
-    });
+      angle = value;
+      var len = intersectionPath.length / 2;
+      var iStartX = intersectionPath.start.dx;
+      var iStartY = intersectionPath.start.dy;
+      var iEndX = intersectionPath.end.dx;
+      var iEndY = intersectionPath.end.dy;
+      double radAngle;
+      Offset newStart;
+      Offset newEnd;
+      double xDiff;
+      double yDiff;
 
+      if (angle >= 0 && angle <= 90) {
+        radAngle = value * pi / 180;
+        xDiff = sin(radAngle) * len;
+        yDiff = cos(radAngle) * len;
+
+        newStart = Offset(iStartX + xDiff, iStartY + (len - yDiff));
+        newEnd = Offset(iEndX - xDiff, iEndY - (len - yDiff));
+      }
+      if (angle > 90 && angle <= 180) {
+        radAngle = (value - 90) * pi / 180;
+        xDiff = sin(radAngle) * intersectionPath.length / 2;
+        yDiff = cos(radAngle) * intersectionPath.length / 2;
+
+        newStart = Offset(iStartX - xDiff, iStartY + yDiff);
+        newEnd = Offset(iEndX + xDiff, iEndY - yDiff);
+      }
+      if (angle > 180 && angle <= 270) {
+        radAngle = (value - 180) * pi / 180;
+        xDiff = cos(radAngle) * intersectionPath.length / 2;
+        yDiff = sin(radAngle) * intersectionPath.length / 2;
+
+        newStart = Offset(iStartX - xDiff, iStartY - yDiff);
+        newEnd = Offset(iEndX + xDiff, iEndY + yDiff);
+      }
+      if (angle > 270 && angle <= 360) {
+        radAngle = (value - 270) * pi / 180;
+        xDiff = cos(radAngle) * intersectionPath.length / 2;
+        yDiff = sin(radAngle) * intersectionPath.length / 2;
+
+        newStart = Offset(iStartX + xDiff, iStartY - yDiff);
+        newEnd = Offset(iEndX - xDiff, iEndY + yDiff);
+      }
+
+      intersectionPath.start = newStart;
+      intersectionPath.end = newEnd;
+    });
     _intersectionPoints();
   }
 
@@ -141,24 +190,21 @@ class _PolygonConceptState extends State<PolygonConcept> {
     setState(() {
       intersectionPoints.clear();
     });
-    var offsetStart = Offset(rotateVal, 0);
-    var offsetEnd = Offset(
-      MediaQuery.of(context).size.width - rotateVal,
-      MediaQuery.of(context).size.height,
-    );
+    var iStart = intersectionPath.start;
+    var iEnd = intersectionPath.end;
 
     for (var i = 0; i < polygonOffsets.length - 1; i++) {
       var intersectDetector = IntersectionDetector(
-        offsetStart,
-        offsetEnd,
+        iStart,
+        iEnd,
         polygonOffsets[i],
         polygonOffsets[i + 1],
       );
 
       if (intersectDetector.isIntersect()) {
-        double a1 = offsetEnd.dy - offsetStart.dy;
-        double b1 = offsetStart.dx - offsetEnd.dx;
-        double c1 = a1 * offsetStart.dx + b1 * offsetStart.dy;
+        double a1 = iEnd.dy - iStart.dy;
+        double b1 = iStart.dx - iEnd.dx;
+        double c1 = a1 * iStart.dx + b1 * iStart.dy;
 
         double a2 = polygonOffsets[i + 1].dy - polygonOffsets[i].dy;
         double b2 = polygonOffsets[i].dx - polygonOffsets[i + 1].dx;
@@ -199,22 +245,14 @@ class _PolygonConceptState extends State<PolygonConcept> {
     setState(() {
       if (polygonPoints.length >= 2) {
         polygonPoints.add(latLng);
+
+        //add first elements additionally to the end to complete the chain
         polygonPoints.add(polygonPoints.first);
+        polygonOffsets.add(polygonOffsets.first);
+
         isPolygonCompleted = true;
 
-        intersectionPath = Container(
-          child: CustomPaint(
-            painter: EdgePainter(
-              Offset(0, 0),
-              Offset(
-                MediaQuery.of(context).size.width,
-                MediaQuery.of(context).size.height,
-              ),
-              color: Colors.yellow,
-            ),
-            child: Container(),
-          ),
-        );
+        intersectionPath = IntersectionPath(context);
       }
     });
 
@@ -256,7 +294,7 @@ class EdgePainter extends CustomPainter {
   final Offset offsetEnd;
   final Color color;
 
-  EdgePainter(this.offsetStart, this.offsetEnd, {this.color = Colors.purple});
+  EdgePainter(this.offsetStart, this.offsetEnd, {this.color = Colors.red});
 
   @override
   void paint(Canvas canvas, Size size) {
