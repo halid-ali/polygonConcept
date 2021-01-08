@@ -202,24 +202,12 @@ class _PolygonConceptState extends State<PolygonConcept> {
       );
 
       if (intersectDetector.isIntersect()) {
-        double a1 = iEnd.dy - iStart.dy;
-        double b1 = iStart.dx - iEnd.dx;
-        double c1 = a1 * iStart.dx + b1 * iStart.dy;
-
-        double a2 = polygonOffsets[i + 1].dy - polygonOffsets[i].dy;
-        double b2 = polygonOffsets[i].dx - polygonOffsets[i + 1].dx;
-        double c2 = a2 * polygonOffsets[i].dx + b2 * polygonOffsets[i].dy;
-
-        double delta = a1 * b2 - a2 * b1;
-        Offset intersection = delta == 0
-            ? Offset(150, 30)
-            : Offset((b2 * c1 - b1 * c2) / delta, (a1 * c2 - a2 * c1) / delta);
-
         setState(() {
           intersectionPoints.add(
             Container(
               child: CustomPaint(
-                painter: CrossPointer(intersection),
+                painter:
+                    CrossPointer(intersectDetector.getIntersectionOffset()),
                 child: Container(),
               ),
             ),
@@ -230,6 +218,7 @@ class _PolygonConceptState extends State<PolygonConcept> {
   }
 
   void _handleTap(LatLng latLng) {
+    print('tapped');
     setState(() {
       if (isPolygonCompleted) {
         isPolygonCompleted = false;
@@ -248,7 +237,7 @@ class _PolygonConceptState extends State<PolygonConcept> {
 
         //add first elements additionally to the end to complete the chain
         polygonPoints.add(polygonPoints.first);
-        polygonOffsets.add(polygonOffsets.first);
+        //polygonOffsets.add(polygonOffsets.first);
 
         isPolygonCompleted = true;
 
